@@ -23,6 +23,12 @@ namespace Gameplay.Physics
             Collidable = true;
         }
 
+        public Solid(Box bounds) 
+        {
+            _bounds = bounds;
+            Collidable = true;
+        }
+
         public void Move(float2 delta)
         {
             Move(delta.x, delta.y);
