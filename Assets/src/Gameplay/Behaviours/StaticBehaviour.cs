@@ -22,7 +22,9 @@ namespace Gameplay.Behaviours
 
         private void Start()
         {
-            _solid = new Solid(new int2(_position.x, _position.y), new int2(_size.x, _size.y));
+            var pos  = transform.position;
+            var size = transform.lossyScale;
+            _solid = new Solid(new int2((int)pos.x, (int)pos.y), new int2((int)size.x, (int)size.y));
             Scene.Current.Add(_solid);
         }
 
