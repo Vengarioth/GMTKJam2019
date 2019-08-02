@@ -12,17 +12,32 @@ namespace Gameplay.Behaviours
     public class StaticBehaviour : MonoBehaviour
     {
         [SerializeField]
-        private Vector2Int _position;
-        [SerializeField]
-        private Vector2Int _size;
-        [SerializeField]
         private int _pixelPerUnit = 100;
 
         private Solid _solid;
 
+        private Box TransformAsBox() {
+
+            var spriteSize = GetComponent<SpriteRenderer>().sprite.rect.size;
+
+            var pos  = transform.position;
+            var size = transform.lossyScale;
+
+            pos  *= _pixelPerUnit;
+
+            size.x *= spriteSize.x; //apply sprite size
+            size.y *= spriteSize.y;
+
+            pos -= size * .5f;
+
+            var ipos  = new int2((int)pos.x , (int)pos.y);
+            var isize = new int2((int)size.x, (int)size.y);
+            return new Box(ipos, isize);
+        }
+
         private void Start()
         {
-            _solid = new Solid(new int2(_position.x, _position.y), new int2(_size.x, _size.y));
+            _solid = new Solid(TransformAsBox());
             Scene.Current.Add(_solid);
         }
 
@@ -32,8 +47,9 @@ namespace Gameplay.Behaviours
             Vector2Int s;
             if (_solid == null)
             {
-                p = _position;
-                s = _size;
+                var box = TransformAsBox();
+                p = new Vector2Int(box.Position.x, box.Position.y);
+                s = new Vector2Int(box.Size.x, box.Size.y);
             }
             else
             {
