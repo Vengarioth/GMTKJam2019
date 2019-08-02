@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Gameplay.Behaviors
+namespace Gameplay.Behaviours
 {
     public class PlayerBehaviour : MonoBehaviour
     {
@@ -33,6 +33,8 @@ namespace Gameplay.Behaviors
 
             _actor.MoveY(vertical * 10f, null);
             _actor.MoveX(horizontal * 10f, null);
+
+            FindObjectOfType<CanvasBehaviour>().Draw(_actor.Bounds, byte.MaxValue);
 
             var position = new Vector2(_actor.Bounds.Position.x / (float)_pixelPerUnit, _actor.Bounds.Position.y / (float)_pixelPerUnit);
             var size = new Vector2(_actor.Bounds.Size.x / (float)_pixelPerUnit, _actor.Bounds.Size.y / (float)_pixelPerUnit);
