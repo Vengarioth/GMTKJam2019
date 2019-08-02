@@ -30,8 +30,8 @@ namespace Gameplay.Behaviours
 
             pos -= size * .5f;
 
-            var ipos  = new int2((int)pos.x , (int)pos.y);
-            var isize = new int2((int)size.x, (int)size.y);
+            var ipos  = new int2((int)Math.Round(pos.x) , (int)Math.Round(pos.y));
+            var isize = new int2((int)Math.Round(size.x), (int)Math.Round(size.y));
             return new Box(ipos, isize);
         }
 
