@@ -63,6 +63,34 @@ namespace Gameplay.Physics
             }.Schedule(_data.Length, 32).Complete();
         }
 
+        public bool Overlaps(Box box)
+        {
+            int x = 0;
+            int y = 0;
+            int index = 0;
+
+            var from = box.Position;
+            var to = box.Position + box.Size;
+
+            for (x = from.x; x < to.x; x++)
+            {
+                if (x < 0 || x > _width)
+                    continue;
+
+                for (y = from.y; y < to.y; y++)
+                {
+                    if (y < 0 || y > _height - 1)
+                        continue;
+
+                    index = PositionToIndex(new int2(x, y));
+                    if (_data[index] > 0)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
         public void FillBox(Box box, byte value)
         {
             int x = 0;
