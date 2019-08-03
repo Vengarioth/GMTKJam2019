@@ -121,16 +121,19 @@ namespace Gameplay.Behaviours
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
-            //Horizontal movement
-            if (true) {
-                var spdMax = 0.8f;
+            //Horizontal movement stuff in this scope
+            {
+                //tweakers
+                var spdMax = 0.8f; //upper bound (tweak this)
+
+                //prepare vars
                 var hv = _horizontalVel;
                 var tv = horizontalInput * spdMax; //tv = target velocity
 
                 var normalizer = sign(hv);
                 if (abs(normalizer) < 0.01) normalizer = sign(tv);
 
-                //normalize: positive == in current direction, negative == in opposite direction
+                //normalize: positive == in current walking direction, negative == in opposite direction
                 hv *= normalizer;
                 tv *= normalizer;
 
@@ -139,33 +142,22 @@ namespace Gameplay.Behaviours
                 if (tv > hv) { //if we want to move faster in the same direction than we currently do
                     //accelerate!
                     //Debug.Log("accelerate " + tv + " >  " + hv);
-                    hv += 0.1f;
+                    hv += 0.1f; //how much to accelerate (tweak this)
                 }
-                else {//slow down!
+                else {//if we want to slow down, or move in the other direction
+
                     //Debug.Log("decellerate " + tv + " <= " + hv);
-                    hv -= 0.2f;
+                    hv -= 0.2f; //how much to decellerate (tweak this)
 
                     if (hv < 0f) //but don't start moving backwards!
                         hv = 0f;
                 }
 
                 bool wallBonk = _actor.CollidesLeft() || _actor.CollidesRight();
-                bool speedIsTiny = abs(prevHv) < 0.05f;
-                bool slowingDown = abs(hv) < abs(prevHv);
+                bool alreadyStopped = abs(prevHv) < 0.001f;
 
-                if ((slowingDown && speedIsTiny)) {
-                    hv = 0f;
-                }
-
-                if (wallBonk && !speedIsTiny) { //don't reset if speed is tiny! otherwise you perma-stick to the wall
-                    //vertical += 10f;
-                    if (_actor.IsGrounded()) {
-                        hv *= -1; //if on ground, bonk backwards!
-                        vertical += 10; //and bonk upward a little? remove if annoying
-                    }
-                    else {
-                        hv = 0; // if airbound, just slide on the wall
-                    }
+                if (wallBonk && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
+                    hv = 0;
                 }
 
                 hv *= normalizer; //de-normalize
