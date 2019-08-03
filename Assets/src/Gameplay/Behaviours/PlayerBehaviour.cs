@@ -42,6 +42,8 @@ namespace Gameplay.Behaviours
         private int _stamina;
         private bool _jumpReleased;
         private int _amtOfFramesSinceJumpWasReleased = 0;
+        private int _lastWallkickDir = 0;
+        private int _wallKickMovementTimeout = 0; //ignore inputs against wall for a short period of time after wallkick
 
         private void Start()
         {
@@ -68,6 +70,16 @@ namespace Gameplay.Behaviours
         {
             var isGrounded = _actor.IsGrounded();
             var horizontalInput = Input.GetAxis("Horizontal");
+
+            if (_wallKickMovementTimeout > 0) { //don't allow steering against the wall immediately after a wallkick
+                --_wallKickMovementTimeout;
+
+                horizontalInput = _lastWallkickDir;
+                //if ((int)sign(horizontalInput) == -_lastWallkickDir) {
+                //    horizontalInput = 0;
+                //}
+            }
+
             var doJump = Input.GetButton("Jump");
 
             var wallTouchL = _actor.CollidesLeft();
@@ -102,6 +114,7 @@ namespace Gameplay.Behaviours
             {
                 _stamina = _maxStamina;
                 _amtOfFramesSinceJumpWasReleased = 0; //reset jump frames because we're back on ground
+                _wallKickMovementTimeout = 0;
             }
 
             if (!doJump)
@@ -131,6 +144,9 @@ namespace Gameplay.Behaviours
                 velocity.y = v;
 
                 doWallKick = true;
+
+                _lastWallkickDir = -wallTouchDir;
+                _wallKickMovementTimeout = 10; // frames until player input against the wall works again
             }
 
             if (doJump && !isGrounded && _jumpReleased && _stamina >= 20)
@@ -204,7 +220,7 @@ namespace Gameplay.Behaviours
                 hv *= normalizer; //de-normalize
 
                 if (doWallKick) {
-                    hv += wallTouchDir * -2f;
+                    hv += wallTouchDir * -1.3f;
                 }
 
                 //hv = clamp(hv, -spdMax, spdMax);
