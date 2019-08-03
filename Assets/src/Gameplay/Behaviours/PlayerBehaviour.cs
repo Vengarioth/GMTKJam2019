@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
+using static Unity.Mathematics.math;
 
 namespace Gameplay.Behaviours
 {
@@ -36,6 +37,7 @@ namespace Gameplay.Behaviours
 
         private float2 _velocity;
         private float2 _acceleration;
+        private float _horizontalVel = 0;
         private bool _wasGrounded;
         private int _stamina;
         private bool _jumpReleased;
@@ -107,23 +109,68 @@ namespace Gameplay.Behaviours
                 velocity.y = v;
             }
 
-            if(_actor.IsFloored())
+            if(_actor.IsFloored()) //if touches ceiling
             {
-                velocity.y = 0;
+                velocity.y = 0; //prevent sticking to ceiling when hitting it early in the jump
             }
 
             acceleration.y = g;
-            
+
+
+
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
-            var horizontal = horizontalInput * _maxHorizontalSpeed * dt;
-            
+            //Horizontal movement stuff in this scope
+            {
+                //tweakers
+                var spdMax = 0.8f; //upper bound (tweak this)
+
+                //prepare vars
+                var hv = _horizontalVel;
+                var tv = horizontalInput * spdMax; //tv = target velocity
+
+                var normalizer = sign(hv);
+                if (abs(normalizer) < 0.01) normalizer = sign(tv);
+
+                //normalize: positive == in current walking direction, negative == in opposite direction
+                hv *= normalizer;
+                tv *= normalizer;
+
+                var prevHv = hv; //hv of previous frame
+
+                if (tv > hv) { //if we want to move faster in the same direction than we currently do
+                    //accelerate!
+                    //Debug.Log("accelerate " + tv + " >  " + hv);
+                    hv += 0.1f; //how much to accelerate (tweak this)
+                }
+                else {//if we want to slow down, or move in the other direction
+
+                    //Debug.Log("decellerate " + tv + " <= " + hv);
+                    hv -= 0.2f; //how much to decellerate (tweak this)
+
+                    if (hv < 0f) //but don't start moving backwards!
+                        hv = 0f;
+                }
+
+                bool wallBonk = _actor.CollidesLeft() || _actor.CollidesRight();
+                bool alreadyStopped = abs(prevHv) < 0.001f;
+
+                if (wallBonk && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
+                    hv = 0;
+                }
+
+                hv *= normalizer; //de-normalize
+
+                hv = clamp(hv, -spdMax, spdMax);
+                _horizontalVel = hv;
+            }
+
             _velocity = velocity;
             _acceleration = acceleration;
 
             _actor.MoveY(vertical, null);
-            _actor.MoveX(horizontal * 10f, null);
+            _actor.MoveX(_horizontalVel * 10f, null);
 
             _wasGrounded = isGrounded;
 
