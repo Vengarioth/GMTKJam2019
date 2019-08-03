@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
+using static Unity.Mathematics.math;
 
 namespace Gameplay.Behaviours
 {
@@ -36,6 +37,7 @@ namespace Gameplay.Behaviours
 
         private float2 _velocity;
         private float2 _acceleration;
+        private float _horizontalVel = 0;
         private bool _wasGrounded;
         private int _stamina;
         private bool _jumpReleased;
@@ -107,23 +109,76 @@ namespace Gameplay.Behaviours
                 velocity.y = v;
             }
 
-            if(_actor.IsFloored())
+            if(_actor.IsFloored()) //if touches ceiling
             {
-                velocity.y = 0;
+                velocity.y = 0; //prevent sticking to ceiling when hitting it early in the jump
             }
 
             acceleration.y = g;
-            
+
+
+
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
-            var horizontal = horizontalInput * _maxHorizontalSpeed * dt;
-            
+            //Horizontal movement
+            if (true) {
+                var spdMax = 0.8f;
+                var hv = _horizontalVel;
+                var tv = horizontalInput * spdMax; //tv = target velocity
+
+                var normalizer = sign(hv);
+                if (abs(normalizer) < 0.01) normalizer = sign(tv);
+
+                //normalize: positive == in current direction, negative == in opposite direction
+                hv *= normalizer;
+                tv *= normalizer;
+
+                var prevHv = hv; //hv of previous frame
+
+                if (tv > hv) { //if we want to move faster in the same direction than we currently do
+                    //accelerate!
+                    //Debug.Log("accelerate " + tv + " >  " + hv);
+                    hv += 0.1f;
+                }
+                else {//slow down!
+                    //Debug.Log("decellerate " + tv + " <= " + hv);
+                    hv -= 0.2f;
+
+                    if (hv < 0f) //but don't start moving backwards!
+                        hv = 0f;
+                }
+
+                bool wallBonk = _actor.CollidesLeft() || _actor.CollidesRight();
+                bool speedIsTiny = abs(prevHv) < 0.05f;
+                bool slowingDown = abs(hv) < abs(prevHv);
+
+                if ((slowingDown && speedIsTiny)) {
+                    hv = 0f;
+                }
+
+                if (wallBonk && !speedIsTiny) { //don't reset if speed is tiny! otherwise you perma-stick to the wall
+                    //vertical += 10f;
+                    if (_actor.IsGrounded()) {
+                        hv *= -1; //if on ground, bonk backwards!
+                        vertical += 10; //and bonk upward a little? remove if annoying
+                    }
+                    else {
+                        hv = 0; // if airbound, just slide on the wall
+                    }
+                }
+
+                hv *= normalizer; //de-normalize
+
+                hv = clamp(hv, -spdMax, spdMax);
+                _horizontalVel = hv;
+            }
+
             _velocity = velocity;
             _acceleration = acceleration;
 
             _actor.MoveY(vertical, null);
-            _actor.MoveX(horizontal * 10f, null);
+            _actor.MoveX(_horizontalVel * 10f, null);
 
             _wasGrounded = isGrounded;
 
