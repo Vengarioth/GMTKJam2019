@@ -4,21 +4,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Unity.Mathematics;
 using UnityEngine;
 
 namespace Gameplay.Behaviours
 {
-    public class StaticBehaviour : MonoBehaviour
+    public class Spikes : MonoBehaviour
     {
         [SerializeField]
         private int _pixelPerUnit = 100;
 
-        private Solid _solid;
+        private Trigger _trigger;
 
-        private Box TransformAsBox() {
+        private Box TransformAsBox()
+        {
             var spriteSize = GetComponent<SpriteRenderer>().sprite.rect.size;
-            var position  = transform.position;
+            var position = transform.position;
             var size = transform.lossyScale;
 
             return ConversionUtil.GetObjectBox(spriteSize, position, size, _pixelPerUnit);
@@ -26,15 +26,24 @@ namespace Gameplay.Behaviours
 
         private void Start()
         {
-            _solid = new Solid(TransformAsBox());
-            Scene.Current.Add(_solid);
+            _trigger = new Trigger(TransformAsBox(), OnActorEnter, OnActorLeave);
+            Scene.Current.Add(_trigger);
+        }
+
+        private void OnActorEnter(Actor actor)
+        {
+            actor.Squish();
+        }
+
+        private void OnActorLeave(Actor actor)
+        {
         }
 
         private void OnDrawGizmos()
         {
             Vector2Int p;
             Vector2Int s;
-            if (_solid == null)
+            if (_trigger == null)
             {
                 var box = TransformAsBox();
                 p = new Vector2Int(box.Position.x, box.Position.y);
@@ -42,8 +51,8 @@ namespace Gameplay.Behaviours
             }
             else
             {
-                p = new Vector2Int(_solid.Bounds.Position.x, _solid.Bounds.Position.y);
-                s = new Vector2Int(_solid.Bounds.Size.x, _solid.Bounds.Size.y);
+                p = new Vector2Int(_trigger.Bounds.Position.x, _trigger.Bounds.Position.y);
+                s = new Vector2Int(_trigger.Bounds.Size.x, _trigger.Bounds.Size.y);
             }
 
             var position = new Vector2(p.x / (float)_pixelPerUnit, p.y / (float)_pixelPerUnit);
@@ -51,7 +60,7 @@ namespace Gameplay.Behaviours
             var halfSize = size * 0.5f;
             var center = position + halfSize;
 
-            Gizmos.color = Color.green;
+            Gizmos.color = Color.red;
             Gizmos.DrawWireCube(center, size);
         }
     }

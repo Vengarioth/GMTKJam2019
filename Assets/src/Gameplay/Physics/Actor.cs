@@ -16,9 +16,27 @@ namespace Gameplay.Physics
         private float _xRemainder;
         private float _yRemainder;
 
-        public Actor(int2 position, int2 size)
+        private Action _onSquish;
+
+        public Actor(int2 position, int2 size, Action onSquish)
         {
             _bounds = new Box(position, size);
+            _onSquish = onSquish;
+        }
+
+        public Actor(Box box, Action onSquish)
+        {
+            _bounds = box;
+            _onSquish = onSquish;
+        }
+
+        public void Teleport(int2 position, Action onCollide)
+        {
+            _bounds.Position = position;
+            if(Scene.Current.CollidesSolid(_bounds))
+            {
+                onCollide?.Invoke();
+            }
         }
 
         public void MoveX(float amount, Action onCollide)
@@ -40,6 +58,8 @@ namespace Gameplay.Physics
                             _bounds.Position.x += 1;
                             move -= 1;
 
+                            Scene.Current.UpdateTriggers(this);
+
                             Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
                         }
                         else
@@ -58,6 +78,8 @@ namespace Gameplay.Physics
                         {
                             _bounds.Position.x -= 1;
                             move += 1;
+
+                            Scene.Current.UpdateTriggers(this);
 
                             Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
                         }
@@ -90,6 +112,8 @@ namespace Gameplay.Physics
                             _bounds.Position.y += 1;
                             move -= 1;
 
+                            Scene.Current.UpdateTriggers(this);
+
                             Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
                         }
                         else
@@ -108,6 +132,8 @@ namespace Gameplay.Physics
                         {
                             _bounds.Position.y -= 1;
                             move += 1;
+
+                            Scene.Current.UpdateTriggers(this);
 
                             Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
                         }
@@ -128,8 +154,17 @@ namespace Gameplay.Physics
 
         public bool IsGrounded()
         {
-            var groundBox = new Box(new int2(_bounds.Position.x, _bounds.Position.y - 1), new int2(_bounds.Size.x, 1));
-            return Scene.Current.CollidesSolid(groundBox);
+            return Scene.Current.CollidesSolid(_bounds.RowBottom());
+        }
+
+        public bool CollidesLeft()
+        {
+            return Scene.Current.CollidesSolid(_bounds.RowLeft());
+        }
+
+        public bool CollidesRight()
+        {
+            return Scene.Current.CollidesSolid(_bounds.RowRight());
         }
 
         public bool Overlaps(Box box)
@@ -144,7 +179,7 @@ namespace Gameplay.Physics
 
         public void Squish()
         {
-
+            _onSquish?.Invoke();
         }
     }
 }

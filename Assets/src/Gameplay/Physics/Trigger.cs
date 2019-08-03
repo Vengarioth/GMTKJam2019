@@ -16,9 +16,51 @@ namespace Gameplay.Physics
         private float _xRemainder;
         private float _yRemainder;
 
-        public Trigger(int2 position, int2 size)
+        private List<Actor> _residentActors;
+        private Action<Actor> _onEnter;
+        private Action<Actor> _onLeave;
+
+        public Trigger(int2 position, int2 size, Action<Actor> onEnter, Action<Actor> onLeave)
         {
             _bounds = new Box(position, size);
+            Enabled = true;
+
+            _residentActors = new List<Actor>();
+
+            _onEnter = onEnter;
+            _onLeave = onLeave;
+
+        }
+
+        public Trigger(Box box, Action<Actor> onEnter, Action<Actor> onLeave)
+        {
+            _bounds = box;
+            Enabled = true;
+
+            _residentActors = new List<Actor>();
+
+            _onEnter = onEnter;
+            _onLeave = onLeave;
+        }
+
+        public void Check(Actor actor)
+        {
+            if(Bounds.Overlaps(actor.Bounds))
+            {
+                if (_residentActors.Contains(actor))
+                    return;
+
+                _residentActors.Add(actor);
+                _onEnter?.Invoke(actor);
+            }
+            else
+            {
+                if (!_residentActors.Contains(actor))
+                    return;
+
+                _residentActors.Remove(actor);
+                _onLeave?.Invoke(actor);
+            }
         }
 
         public bool Overlaps(Box box)

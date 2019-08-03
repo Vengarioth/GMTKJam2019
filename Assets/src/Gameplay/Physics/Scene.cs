@@ -110,6 +110,15 @@ namespace Gameplay.Physics
             return false;
         }
 
+        public void UpdateTriggers(Actor actor)
+        {
+            for(int i = 0; i < _trigger.Count; i++)
+            {
+                var trigger = _trigger[i];
+                trigger.Check(actor);
+            }
+        }
+
         public Actor[] GetActors()
         {
             return _actors.ToArray();

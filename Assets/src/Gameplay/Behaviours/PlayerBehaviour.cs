@@ -42,17 +42,29 @@ namespace Gameplay.Behaviours
 
         private void Start()
         {
-            _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y));
+            _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y), OnSquish);
             Scene.Current.Add(_actor);
             _wasGrounded = _actor.IsGrounded();
 
             _stamina = _maxStamina;
         }
 
+        private void OnSquish()
+        {
+            _actor.Teleport(new int2(_position.x, _position.y), _actor.Squish);
+            _velocity = new float2(0f, 0f);
+        }
+
+        public void Replenish()
+        {
+            Debug.Log("Replenish");
+            _stamina = _maxStamina;
+        }
+
         private void Update()
         {
             var isGrounded = _actor.IsGrounded();
-            var horizontal = Input.GetAxis("Horizontal");
+            var horizontalInput = Input.GetAxis("Horizontal");
             var doJump = Input.GetButton("Jump");
 
             var dt = Time.deltaTime;
@@ -101,10 +113,12 @@ namespace Gameplay.Behaviours
             }
 
             acceleration.y = g;
-
+            
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
+            var horizontal = horizontalInput * _maxHorizontalSpeed * dt;
+            
             _velocity = velocity;
             _acceleration = acceleration;
 

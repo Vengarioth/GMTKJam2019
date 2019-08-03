@@ -39,7 +39,7 @@ namespace Gameplay.Physics
         public Box RowRight(int thickness = 1)
         {
             return new Box(
-                new int2(Position.x + Size.y + 1, Position.y),
+                new int2(Position.x + Size.y + thickness, Position.y),
                 new int2(thickness, Size.y)
             );
         }
@@ -57,6 +57,14 @@ namespace Gameplay.Physics
             return new Box(
                 new int2(Position.x, Position.y + Size.y),
                 new int2(Size.x, thickness)
+            );
+        }
+
+        public Box RowLeft(int thickness = 1)
+        {
+            return new Box(
+                new int2(Position.x - thickness, Position.y),
+                new int2(thickness, Size.y)
             );
         }
     }
