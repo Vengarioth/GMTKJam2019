@@ -13,12 +13,14 @@ namespace Gameplay.Physics
         private List<Actor> _actors;
         private List<Solid> _solids;
         private List<Trigger> _trigger;
+        private List<PixelBuffer> _pixelBuffer;
 
         public Scene()
         {
             _actors = new List<Actor>();
             _solids = new List<Solid>();
             _trigger = new List<Trigger>();
+            _pixelBuffer = new List<PixelBuffer>();
         }
 
         public void Add(Actor actor)
@@ -49,6 +51,16 @@ namespace Gameplay.Physics
         public void Remove(Trigger trigger)
         {
             _trigger.Remove(trigger);
+        }
+
+        public void Add(PixelBuffer pixelBuffer)
+        {
+            _pixelBuffer.Add(pixelBuffer);
+        }
+
+        public void Remove(PixelBuffer pixelBuffer)
+        {
+            _pixelBuffer.Remove(pixelBuffer);
         }
 
         public bool CollidesActor(Box box)
