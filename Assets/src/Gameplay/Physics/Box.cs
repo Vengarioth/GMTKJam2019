@@ -35,5 +35,37 @@ namespace Gameplay.Physics
         {
             return new Box(Position + delta, Size);
         }
+
+        public Box RowRight(int thickness = 1)
+        {
+            return new Box(
+                new int2(Position.x + Size.y + thickness, Position.y),
+                new int2(thickness, Size.y)
+            );
+        }
+
+        public Box RowBottom(int thickness = 1)
+        {
+            return new Box(
+                new int2(Position.x, Position.y - thickness),
+                new int2(Size.x, thickness)
+            );
+        }
+
+        public Box RowTop(int thickness = 1)
+        {
+            return new Box(
+                new int2(Position.x, Position.y + Size.y),
+                new int2(Size.x, thickness)
+            );
+        }
+
+        public Box RowLeft(int thickness = 1)
+        {
+            return new Box(
+                new int2(Position.x - thickness, Position.y),
+                new int2(thickness, Size.y)
+            );
+        }
     }
 }

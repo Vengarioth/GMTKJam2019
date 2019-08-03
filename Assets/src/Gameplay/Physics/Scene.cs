@@ -58,6 +58,11 @@ namespace Gameplay.Physics
             _pixelBuffer.Add(pixelBuffer);
         }
 
+        public PixelBuffer GetPixelBuffer()
+        {
+            return _pixelBuffer[0];
+        }
+
         public void Remove(PixelBuffer pixelBuffer)
         {
             _pixelBuffer.Remove(pixelBuffer);
@@ -103,6 +108,15 @@ namespace Gameplay.Physics
             }
 
             return false;
+        }
+
+        public void UpdateTriggers(Actor actor)
+        {
+            for(int i = 0; i < _trigger.Count; i++)
+            {
+                var trigger = _trigger[i];
+                trigger.Check(actor);
+            }
         }
 
         public Actor[] GetActors()
