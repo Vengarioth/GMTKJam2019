@@ -70,6 +70,21 @@ namespace Gameplay.Behaviours
             var horizontalInput = Input.GetAxis("Horizontal");
             var doJump = Input.GetButton("Jump");
 
+            var wallTouchL = _actor.CollidesLeft();
+            var wallTouchR = _actor.CollidesRight();
+            var wallTouch = wallTouchL || wallTouchR;
+
+            int wallTouchDir = 0;
+            if (wallTouchL)
+                wallTouchDir += -1;//can't convert bool to int in c#??
+            if (wallTouchR)
+                wallTouchDir += +1;
+
+            bool horizontalInputIsAgainstWall = (int)sign(horizontalInput) == wallTouchDir;
+
+
+            bool doWallKick = false;
+
             var dt = Time.deltaTime;
             var velocity = _velocity;
             var acceleration = _acceleration;
@@ -109,7 +124,16 @@ namespace Gameplay.Behaviours
                 _jumpReleased = true;
             }
 
-            if(doJump && !isGrounded && _jumpReleased && _stamina >= 20)
+            if (doJump && !isGrounded && _jumpReleased && wallTouch && horizontalInputIsAgainstWall)
+            {
+                _jumpReleased = false;
+                Debug.Log("Wallkick");
+                velocity.y = v;
+
+                doWallKick = true;
+            }
+
+            if (doJump && !isGrounded && _jumpReleased && _stamina >= 20)
             {
                 _stamina -= 20;
                 _jumpReleased = false;
@@ -171,16 +195,20 @@ namespace Gameplay.Behaviours
                         hv = 0f;
                 }
 
-                bool wallBonk = _actor.CollidesLeft() || _actor.CollidesRight();
                 bool alreadyStopped = abs(prevHv) < 0.001f;
 
-                if (wallBonk && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
+                if (wallTouch && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
                     hv = 0;
                 }
 
                 hv *= normalizer; //de-normalize
 
-                hv = clamp(hv, -spdMax, spdMax);
+                if (doWallKick) {
+                    hv += wallTouchDir * -2f;
+                }
+
+                //hv = clamp(hv, -spdMax, spdMax);
+
                 _horizontalVel = hv;
             }
 
