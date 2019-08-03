@@ -29,19 +29,43 @@ namespace Gameplay.Physics
             if(move != 0)
             {
                 _xRemainder -= move;
-                int sign = Math.Sign(move);
 
-                while(move != 0)
+                if(move > 0)
                 {
-                    if(!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(sign, 0))))
+                    // Move Right
+                    while(move != 0)
                     {
-                        _bounds.Position.x += sign;
-                        move -= sign;
+                        if (!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(1, 0))))
+                        {
+                            _bounds.Position.x += 1;
+                            move -= 1;
+
+                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                        }
+                        else
+                        {
+                            onCollide?.Invoke();
+                            break;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    // Move Left
+                    while (move != 0)
                     {
-                        onCollide?.Invoke();
-                        break;
+                        if (!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(-1, 0))))
+                        {
+                            _bounds.Position.x -= 1;
+                            move += 1;
+
+                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                        }
+                        else
+                        {
+                            onCollide?.Invoke();
+                            break;
+                        }
                     }
                 }
             }
@@ -55,22 +79,57 @@ namespace Gameplay.Physics
             if(move != 0)
             {
                 _yRemainder -= move;
-                int sign = Math.Sign(move);
 
-                while(move != 0)
+                if(move > 0)
                 {
-                    if(!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(0, sign))))
+                    // Move Up
+                    while (move != 0)
                     {
-                        _bounds.Position.y += sign;
-                        move -= sign;
+                        if (!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(0, 1))))
+                        {
+                            _bounds.Position.y += 1;
+                            move -= 1;
+
+                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                        }
+                        else
+                        {
+                            onCollide?.Invoke();
+                            break;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    // Move Down
+                    while (move != 0)
                     {
-                        onCollide?.Invoke();
-                        break;
+                        if (!Scene.Current.CollidesSolid(_bounds.FromOffset(new int2(0, -1))))
+                        {
+                            _bounds.Position.y -= 1;
+                            move += 1;
+
+                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                        }
+                        else
+                        {
+                            onCollide?.Invoke();
+                            break;
+                        }
                     }
                 }
             }
+        }
+
+        public bool IsFloored()
+        {
+            return Scene.Current.CollidesSolid(_bounds.RowTop());
+        }
+
+        public bool IsGrounded()
+        {
+            var groundBox = new Box(new int2(_bounds.Position.x, _bounds.Position.y - 1), new int2(_bounds.Size.x, 1));
+            return Scene.Current.CollidesSolid(groundBox);
         }
 
         public bool Overlaps(Box box)

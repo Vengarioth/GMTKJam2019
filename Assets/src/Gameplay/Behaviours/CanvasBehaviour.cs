@@ -19,6 +19,7 @@ namespace Gameplay.Behaviours
         private void Start()
         {
             _pixelBuffer = new PixelBuffer(_size.x, _size.y);
+            Scene.Current.Add(_pixelBuffer);
             _texture = new Texture2D(_size.x, _size.y, TextureFormat.R8, false);
         }
 
@@ -29,7 +30,7 @@ namespace Gameplay.Behaviours
 
         private void Update()
         {
-            _pixelBuffer.Decay(2);
+            _pixelBuffer.Decay(15);
             _pixelBuffer.FillTexture(_texture);
             GetComponent<Renderer>().material.mainTexture = _texture;
         }

@@ -1,4 +1,5 @@
-﻿using Gameplay.Physics;
+﻿using Debugging;
+using Gameplay.Physics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,27 +19,111 @@ namespace Gameplay.Behaviours
         [SerializeField]
         private int _pixelPerUnit = 100;
 
+        [SerializeField]
+        private float _jumpHeight;
+        [SerializeField]
+        private float _horizontalDistanceToJumpPeak;
+        [SerializeField]
+        private float _maxHorizontalSpeed;
+        [SerializeField]
+        private int _maxStamina = 100;
+
+
+        [SerializeField]
+        private Vector2 _debugAnchor;
+
         private Actor _actor;
+
+        private float2 _velocity;
+        private float2 _acceleration;
+        private bool _wasGrounded;
+        private int _stamina;
+        private bool _jumpReleased;
 
         private void Start()
         {
             _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y));
             Scene.Current.Add(_actor);
+            _wasGrounded = _actor.IsGrounded();
+
+            _stamina = _maxStamina;
         }
 
         private void Update()
         {
+            var isGrounded = _actor.IsGrounded();
             var horizontal = Input.GetAxis("Horizontal");
-            var vertical = Input.GetAxis("Vertical");
+            var doJump = Input.GetButton("Jump");
 
-            _actor.MoveY(vertical * 10f, null);
+            var dt = Time.deltaTime;
+            var velocity = _velocity;
+            var acceleration = _acceleration;
+
+            var xh = _horizontalDistanceToJumpPeak;
+            var vx = _maxHorizontalSpeed;
+            var h = _jumpHeight;
+
+            var g = (-2f * h * vx * vx) / (xh * xh);
+            var v = (2f * h * vx) / xh;
+
+            // refresh stamina
+            if(isGrounded)
+            {
+                _stamina = _maxStamina;
+            }
+
+            if(doJump && isGrounded)
+            {
+                velocity.y = v;
+                _jumpReleased = false;
+            }
+            else if(isGrounded)
+            {
+                velocity.y = 0;
+            }
+
+            if(!doJump)
+            {
+                _jumpReleased = true;
+            }
+
+            if(doJump && !isGrounded && _jumpReleased && _stamina >= 20)
+            {
+                _stamina -= 20;
+                _jumpReleased = false;
+                Debug.Log("Dash");
+                velocity.y = v;
+            }
+
+            if(_actor.IsFloored())
+            {
+                velocity.y = 0;
+            }
+
+            acceleration.y = g;
+
+            var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
+            velocity.y += acceleration.y * dt;
+
+            _velocity = velocity;
+            _acceleration = acceleration;
+
+            _actor.MoveY(vertical, null);
             _actor.MoveX(horizontal * 10f, null);
 
-            FindObjectOfType<CanvasBehaviour>().Draw(_actor.Bounds, byte.MaxValue);
+            _wasGrounded = isGrounded;
 
             var position = new Vector2(_actor.Bounds.Position.x / (float)_pixelPerUnit, _actor.Bounds.Position.y / (float)_pixelPerUnit);
             var size = new Vector2(_actor.Bounds.Size.x / (float)_pixelPerUnit, _actor.Bounds.Size.y / (float)_pixelPerUnit);
             transform.position = position + (size * 0.5f);
+
+            DebugRenderer.Add(new HollowOpenCircle(
+                _debugAnchor,
+                0.3f,
+                0.6f,
+                (float)_stamina / (float)_maxStamina,
+                Color.green
+            ));
         }
 
         private void OnDrawGizmos()

@@ -58,6 +58,11 @@ namespace Gameplay.Physics
             _pixelBuffer.Add(pixelBuffer);
         }
 
+        public PixelBuffer GetPixelBuffer()
+        {
+            return _pixelBuffer[0];
+        }
+
         public void Remove(PixelBuffer pixelBuffer)
         {
             _pixelBuffer.Remove(pixelBuffer);
