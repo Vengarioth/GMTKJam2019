@@ -41,6 +41,7 @@ namespace Gameplay.Behaviours
         private bool _wasGrounded;
         private int _stamina;
         private bool _jumpReleased;
+        private int _amtOfFramesSinceJumpWasReleased = 0;
 
         private void Start()
         {
@@ -80,13 +81,20 @@ namespace Gameplay.Behaviours
             var g = (-2f * h * vx * vx) / (xh * xh);
             var v = (2f * h * vx) / xh;
 
+
             // refresh stamina
-            if(isGrounded)
+            if (isGrounded)
             {
                 _stamina = _maxStamina;
+                _amtOfFramesSinceJumpWasReleased = 0; //reset jump frames because we're back on ground
             }
 
-            if(doJump && isGrounded)
+            if (!doJump)
+            {
+                ++_amtOfFramesSinceJumpWasReleased;
+            }
+
+            if (doJump && isGrounded)
             {
                 velocity.y = v;
                 _jumpReleased = false;
@@ -109,7 +117,12 @@ namespace Gameplay.Behaviours
                 velocity.y = v;
             }
 
-            if(_actor.IsFloored()) //if touches ceiling
+            if (!isGrounded && _jumpReleased && _amtOfFramesSinceJumpWasReleased >= 3) {
+                //g *= 1 + 0.1f * (_amtOfFramesSinceJumpWasReleased - 3f);
+                g = 1.8f * g;
+            }
+
+            if (_actor.IsFloored() && velocity.y > 0) //if touches ceiling
             {
                 velocity.y = 0; //prevent sticking to ceiling when hitting it early in the jump
             }
@@ -121,10 +134,14 @@ namespace Gameplay.Behaviours
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
+            const float fallspeed_cap = 40 * -10f;
+            if (velocity.y < fallspeed_cap) //limit falling speed
+                velocity.y = fallspeed_cap;
+
             //Horizontal movement stuff in this scope
             {
                 //tweakers
-                var spdMax = 0.8f; //upper bound (tweak this)
+                var spdMax = 0.7f; //upper bound (tweak this)
 
                 //prepare vars
                 var hv = _horizontalVel;
@@ -142,12 +159,13 @@ namespace Gameplay.Behaviours
                 if (tv > hv) { //if we want to move faster in the same direction than we currently do
                     //accelerate!
                     //Debug.Log("accelerate " + tv + " >  " + hv);
-                    hv += 0.1f; //how much to accelerate (tweak this)
+                    float amt = _actor.IsGrounded() ? 0.02f : 0.04f;
+                    hv += amt; //how much to accelerate (tweak this)
                 }
                 else {//if we want to slow down, or move in the other direction
 
                     //Debug.Log("decellerate " + tv + " <= " + hv);
-                    hv -= 0.2f; //how much to decellerate (tweak this)
+                    hv -= 0.3f; //how much to decellerate (tweak this)
 
                     if (hv < 0f) //but don't start moving backwards!
                         hv = 0f;
