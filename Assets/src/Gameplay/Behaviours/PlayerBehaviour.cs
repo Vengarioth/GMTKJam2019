@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Unity.Mathematics;
 using UnityEngine;
+using static Unity.Mathematics.math;
 
 namespace Gameplay.Behaviours
 {
@@ -36,12 +37,18 @@ namespace Gameplay.Behaviours
 
         private float2 _velocity;
         private float2 _acceleration;
+        private float _horizontalVel = 0;
         private bool _wasGrounded;
         private int _stamina;
         private bool _jumpReleased;
-        private int _paintTime;
+
+        private int _amtOfFramesSinceJumpWasReleased = 0;
+        private int _lastWallkickDir = 0;
+        private int _wallKickMovementTimeout = 0; //ignore inputs against wall for a short period of time after wallkick
+
         [SerializeField]
         private int _paintTollerance = 5;
+        private int _paintTime;
 
         private void Start()
         {
@@ -84,11 +91,53 @@ namespace Gameplay.Behaviours
             _stamina = _maxStamina;
         }
 
+        private void UpdatePaint(bool isGrounded)
+        {
+            if(!_wasGrounded && isGrounded)
+            {
+                Scene.Current.GetPixelBuffer().Clear();
+                _paintTime = 0;
+            }
+
+            if(!isGrounded)
+            {
+                _paintTime += 1;
+                Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
+            }
+        }
+
         private void Update()
         {
             var isGrounded = _actor.IsGrounded();
             var horizontalInput = Input.GetAxis("Horizontal");
+
+            UpdatePaint(isGrounded);
+
+            if (_wallKickMovementTimeout > 0) { //don't allow steering against the wall immediately after a wallkick
+                --_wallKickMovementTimeout;
+
+                horizontalInput = _lastWallkickDir;
+                //if ((int)sign(horizontalInput) == -_lastWallkickDir) {
+                //    horizontalInput = 0;
+                //}
+            }
+
             var doJump = Input.GetButton("Jump");
+
+            var wallTouchL = _actor.CollidesLeft();
+            var wallTouchR = _actor.CollidesRight();
+            var wallTouch = wallTouchL || wallTouchR;
+
+            int wallTouchDir = 0;
+            if (wallTouchL)
+                wallTouchDir += -1;//can't convert bool to int in c#??
+            if (wallTouchR)
+                wallTouchDir += +1;
+
+            bool horizontalInputIsAgainstWall = (int)sign(horizontalInput) == wallTouchDir;
+
+
+            bool doWallKick = false;
 
             var dt = Time.deltaTime;
             var velocity = _velocity;
@@ -101,20 +150,21 @@ namespace Gameplay.Behaviours
             var g = (-2f * h * vx * vx) / (xh * xh);
             var v = (2f * h * vx) / xh;
 
-            // refresh stamina & clear buffer
-            if(!_wasGrounded && isGrounded)
+
+            // refresh stamina
+            if (isGrounded)
             {
                 _stamina = _maxStamina;
-                Scene.Current.GetPixelBuffer().Clear();
-                _paintTime = 0;
-            }
-            if(!isGrounded)
-            {
-                _paintTime += 1;
-                Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
+                _amtOfFramesSinceJumpWasReleased = 0; //reset jump frames because we're back on ground
+                _wallKickMovementTimeout = 0;
             }
 
-            if(doJump && isGrounded)
+            if (!doJump)
+            {
+                ++_amtOfFramesSinceJumpWasReleased;
+            }
+
+            if (doJump && isGrounded)
             {
                 Debug.Log("Jump");
                 velocity.y = v;
@@ -130,7 +180,19 @@ namespace Gameplay.Behaviours
                 _jumpReleased = true;
             }
 
-            if(doJump && !isGrounded && _jumpReleased && _stamina >= 20)
+            if (doJump && !isGrounded && _jumpReleased && wallTouch && horizontalInputIsAgainstWall)
+            {
+                _jumpReleased = false;
+                Debug.Log("Wallkick");
+                velocity.y = v;
+
+                doWallKick = true;
+
+                _lastWallkickDir = -wallTouchDir;
+                _wallKickMovementTimeout = 10; // frames until player input against the wall works again
+            }
+
+            if (doJump && !isGrounded && _jumpReleased && _stamina >= 20)
             {
                 _stamina -= 20;
                 _jumpReleased = false;
@@ -138,23 +200,82 @@ namespace Gameplay.Behaviours
                 velocity.y = v;
             }
 
-            if(_actor.IsFloored())
+            if (!isGrounded && _jumpReleased && _amtOfFramesSinceJumpWasReleased >= 3) {
+                //g *= 1 + 0.1f * (_amtOfFramesSinceJumpWasReleased - 3f);
+                g = 1.8f * g;
+            }
+
+            if (_actor.IsFloored() && velocity.y > 0) //if touches ceiling
             {
-                velocity.y = 0;
+                velocity.y = 0; //prevent sticking to ceiling when hitting it early in the jump
             }
 
             acceleration.y = g;
-            
+
+
+
             var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
             velocity.y += acceleration.y * dt;
 
-            var horizontal = horizontalInput * _maxHorizontalSpeed * dt;
-            
+            const float fallspeed_cap = 40 * -10f;
+            if (velocity.y < fallspeed_cap) //limit falling speed
+                velocity.y = fallspeed_cap;
+
+            //Horizontal movement stuff in this scope
+            {
+                //tweakers
+                var spdMax = 0.7f; //upper bound (tweak this)
+
+                //prepare vars
+                var hv = _horizontalVel;
+                var tv = horizontalInput * spdMax; //tv = target velocity
+
+                var normalizer = sign(hv);
+                if (abs(normalizer) < 0.01) normalizer = sign(tv);
+
+                //normalize: positive == in current walking direction, negative == in opposite direction
+                hv *= normalizer;
+                tv *= normalizer;
+
+                var prevHv = hv; //hv of previous frame
+
+                if (tv > hv) { //if we want to move faster in the same direction than we currently do
+                    //accelerate!
+                    //Debug.Log("accelerate " + tv + " >  " + hv);
+                    float amt = _actor.IsGrounded() ? 0.02f : 0.04f;
+                    hv += amt; //how much to accelerate (tweak this)
+                }
+                else {//if we want to slow down, or move in the other direction
+
+                    //Debug.Log("decellerate " + tv + " <= " + hv);
+                    hv -= 0.3f; //how much to decellerate (tweak this)
+
+                    if (hv < 0f) //but don't start moving backwards!
+                        hv = 0f;
+                }
+
+                bool alreadyStopped = abs(prevHv) < 0.001f;
+
+                if (wallTouch && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
+                    hv = 0;
+                }
+
+                hv *= normalizer; //de-normalize
+
+                if (doWallKick) {
+                    hv += wallTouchDir * -1.3f;
+                }
+
+                //hv = clamp(hv, -spdMax, spdMax);
+
+                _horizontalVel = hv;
+            }
+
             _velocity = velocity;
             _acceleration = acceleration;
 
             _actor.MoveY(vertical, null);
-            _actor.MoveX(horizontal * 10f, null);
+            _actor.MoveX(_horizontalVel * 10f, null);
 
             _wasGrounded = isGrounded;
 
