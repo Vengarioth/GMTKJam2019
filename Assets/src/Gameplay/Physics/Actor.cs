@@ -17,11 +17,13 @@ namespace Gameplay.Physics
         private float _yRemainder;
 
         private Action _onSquish;
+        private Action _onMove;
 
-        public Actor(int2 position, int2 size, Action onSquish)
+        public Actor(int2 position, int2 size, Action onSquish, Action onMove)
         {
             _bounds = new Box(position, size);
             _onSquish = onSquish;
+            _onMove = onMove;
         }
 
         public Actor(Box box, Action onSquish)
@@ -60,7 +62,7 @@ namespace Gameplay.Physics
 
                             Scene.Current.UpdateTriggers(this);
 
-                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                            _onMove?.Invoke();
                         }
                         else
                         {
@@ -81,7 +83,7 @@ namespace Gameplay.Physics
 
                             Scene.Current.UpdateTriggers(this);
 
-                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                            _onMove?.Invoke();
                         }
                         else
                         {
@@ -114,7 +116,7 @@ namespace Gameplay.Physics
 
                             Scene.Current.UpdateTriggers(this);
 
-                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                            _onMove?.Invoke();
                         }
                         else
                         {
@@ -135,7 +137,7 @@ namespace Gameplay.Physics
 
                             Scene.Current.UpdateTriggers(this);
 
-                            Scene.Current.GetPixelBuffer().FillBox(Bounds, byte.MaxValue);
+                            _onMove?.Invoke();
                         }
                         else
                         {

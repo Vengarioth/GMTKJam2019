@@ -35,36 +35,20 @@ namespace Gameplay.Physics
             return new int2(x, y);
         }
 
-        private struct DecayJob : IJobParallelFor
+        public void Clear()
         {
-            public NativeArray<byte> Data;
-            public byte Amount;
+            Debug.Log("Clear Pixel Buffer");
+            _data.Dispose();
+            _data = new NativeArray<byte>(_width * _height, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+        }
 
-            public void Execute(int index)
+        public bool Overlaps(Box box, byte minValue = byte.MinValue, byte maxValue = byte.MaxValue)
+        {
+            if (box.IsEmpty())
             {
-                byte d = Data[index];
-                if(d >= Amount)
-                {
-                    Data[index] = (byte)(d - Amount);
-                }
-                else
-                {
-                    Data[index] = 0;
-                }
+                Debug.Log("box is empty");
             }
-        }
 
-        public void Decay(byte amount)
-        {
-            new DecayJob
-            {
-                Data = _data,
-                Amount = amount
-            }.Schedule(_data.Length, 32).Complete();
-        }
-
-        public bool Overlaps(Box box)
-        {
             int x = 0;
             int y = 0;
             int index = 0;
@@ -74,17 +58,14 @@ namespace Gameplay.Physics
 
             for (x = from.x; x < to.x; x++)
             {
-                if (x < 0 || x > _width)
-                    continue;
-
                 for (y = from.y; y < to.y; y++)
                 {
-                    if (y < 0 || y > _height - 1)
-                        continue;
-
                     index = PositionToIndex(new int2(x, y));
-                    if (_data[index] > 0)
+                    var value = _data[index];
+                    if (value >= minValue && value <= maxValue)
+                    {
                         return true;
+                    }
                 }
             }
 
