@@ -30,7 +30,6 @@ namespace Gameplay.Behaviours
 
         private void Update()
         {
-            _pixelBuffer.Decay(15);
             _pixelBuffer.FillTexture(_texture);
             GetComponent<Renderer>().material.mainTexture = _texture;
         }

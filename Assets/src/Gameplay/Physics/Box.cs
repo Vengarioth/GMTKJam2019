@@ -67,5 +67,18 @@ namespace Gameplay.Physics
                 new int2(thickness, Size.y)
             );
         }
+
+        public bool IsEmpty()
+        {
+            return Position.x == 0 && Position.y == 0 && Size.x == 0 && Size.y == 0;
+        }
+
+        public Box FromShrink(int amount)
+        {
+            return new Box(
+                new int2(Position.x + amount, Position.y + amount),
+                new int2(Size.x - amount, Size.y - amount)
+            );
+        }
     }
 }

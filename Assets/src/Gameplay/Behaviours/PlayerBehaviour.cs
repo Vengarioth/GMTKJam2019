@@ -39,20 +39,43 @@ namespace Gameplay.Behaviours
         private bool _wasGrounded;
         private int _stamina;
         private bool _jumpReleased;
+        private int _paintTime;
+        [SerializeField]
+        private int _paintTollerance = 5;
 
         private void Start()
         {
-            _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y), OnSquish);
+            _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y), OnSquish, OnMove);
             Scene.Current.Add(_actor);
             _wasGrounded = _actor.IsGrounded();
 
             _stamina = _maxStamina;
         }
 
+        private void OnMove()
+        {
+            var isGrounded = _actor.IsGrounded();
+            var pixelBuffer = Scene.Current.GetPixelBuffer();
+            var box = _actor.Bounds;
+
+            if (!isGrounded)
+            {
+                if(_paintTime > _paintTollerance && pixelBuffer.Overlaps(box, 1, (byte)(_paintTime - _paintTollerance)))
+                {
+                    _actor.Squish();
+                }
+
+                pixelBuffer.FillBox(box.FromShrink(12), (byte)_paintTime);
+            }
+        }
+
         private void OnSquish()
         {
+            Debug.Log("Squish");
             _actor.Teleport(new int2(_position.x, _position.y), _actor.Squish);
             _velocity = new float2(0f, 0f);
+            Scene.Current.GetPixelBuffer().Clear();
+            _paintTime = 0;
         }
 
         public void Replenish()
@@ -78,14 +101,22 @@ namespace Gameplay.Behaviours
             var g = (-2f * h * vx * vx) / (xh * xh);
             var v = (2f * h * vx) / xh;
 
-            // refresh stamina
-            if(isGrounded)
+            // refresh stamina & clear buffer
+            if(!_wasGrounded && isGrounded)
             {
                 _stamina = _maxStamina;
+                Scene.Current.GetPixelBuffer().Clear();
+                _paintTime = 0;
+            }
+            if(!isGrounded)
+            {
+                _paintTime += 1;
+                Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
             }
 
             if(doJump && isGrounded)
             {
+                Debug.Log("Jump");
                 velocity.y = v;
                 _jumpReleased = false;
             }
