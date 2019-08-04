@@ -70,6 +70,22 @@ namespace Gameplay.Behaviours
         private int _paintTollerance = 50;
         private int _paintTime;
 
+        public void OnFinish()
+        {
+            Debug.Log("Finish");
+
+            _actor.Teleport(_spawn, _actor.Squish);
+            _velocity = new float2(0f, 0f);
+            _acceleration = new float2(0f, 0f);
+            Scene.Current.GetPixelBuffer().MergeInto(Scene.Current.GetPixelBackBuffer());
+            Scene.Current.GetPixelBuffer().Clear();
+            _paintTime = 0;
+            Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
+
+            _didJump = true;
+            _didDash = true;
+        }
+
         private Box TransformAsBox()
         {
             var spriteSize = GetComponent<SpriteRenderer>().sprite.rect.size;
@@ -95,11 +111,14 @@ namespace Gameplay.Behaviours
         {
             var isGrounded = _actor.IsGrounded();
             var pixelBuffer = Scene.Current.GetPixelBuffer();
+            var backBuffer = Scene.Current.GetPixelBackBuffer();
             var box = _actor.Bounds;
 
             if (!isGrounded)
             {
-                if(_paintTime > _paintTollerance && pixelBuffer.Overlaps(box, 1, (byte)(_paintTime - _paintTollerance)))
+                if(_paintTime > _paintTollerance 
+                    && (pixelBuffer.Overlaps(box, 1, (byte)(_paintTime - _paintTollerance))
+                    || backBuffer.Overlaps(box, 1, (byte)(_paintTime - _paintTollerance))))
                 {
                     _actor.Squish();
                 }
@@ -116,6 +135,7 @@ namespace Gameplay.Behaviours
             _acceleration = new float2(0f, 0f);
             Scene.Current.GetPixelBuffer().Clear();
             _paintTime = 0;
+            Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
 
             _didJump = true;
             _didDash = true;
@@ -124,17 +144,21 @@ namespace Gameplay.Behaviours
         public void Replenish()
         {
             Debug.Log("Replenish");
-            _stamina = _maxStamina;
+            _refillDash = true;
+        }
+
+        public void Respawn()
+        {
+            OnSquish();
+        }
+
+        public void SetSpawn(int2 spawn)
+        {
+            _spawn = spawn;
         }
 
         private void UpdatePaint()
         {
-            if(!_wasGrounded && _isGrounded)
-            {
-                Scene.Current.GetPixelBuffer().Clear();
-                _paintTime = 0;
-            }
-
             if(!_isGrounded)
             {
                 _paintTime += 1;
@@ -325,11 +349,18 @@ namespace Gameplay.Behaviours
             _mode = Mode.Default;
             _didJump = true;
             _didDash = true;
+
+            if(_refillDash)
+            {
+                _didDash = false;
+                _refillDash = false;
+            }
         }
 
         private int _dashFramesLeft;
         private int _dashFrames = 5;
         private bool _didDash;
+        private bool _refillDash;
         private float2 _dashDirection;
         private void DashUpdate()
         {

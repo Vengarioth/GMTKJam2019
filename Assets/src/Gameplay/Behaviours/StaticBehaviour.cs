@@ -24,6 +24,14 @@ namespace Gameplay.Behaviours
             return ConversionUtil.GetObjectBox(spriteSize, position, size, _pixelPerUnit);
         }
 
+        public void Remove()
+        {
+            gameObject.SetActive(false);
+
+            Scene.Current.Remove(_solid);
+            _solid = null;
+        }
+
         private void Start()
         {
             _solid = new Solid(TransformAsBox());

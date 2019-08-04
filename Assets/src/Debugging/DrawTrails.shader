@@ -2,11 +2,12 @@
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "black" {}
+		_MainTex("Texture", 2D) = "black" {}
+		_BackTex("Texture", 2D) = "black" {}
     }
     SubShader
     {
-        Tags { "RenderType"="Opaque" }
+        Tags { "RenderType"="Transparent" }
         LOD 100
 
         Pass
@@ -34,6 +35,10 @@
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
+
+			sampler2D _BackTex;
+			float4 _BackTex_ST;
+
 			float _PaintTime;
 
             v2f vert (appdata v)
@@ -47,12 +52,16 @@
 
             fixed4 frag (v2f i) : SV_Target
             {
-				float r = tex2D(_MainTex, i.uv).r;
+				float r1 = tex2D(_MainTex, i.uv).r;
+				float r2 = tex2D(_BackTex, i.uv).r;
 
-				r = r <= 0.0 ? 0.0 : r <= _PaintTime ? 1.0 : 0.0;
+				float r = max(r1, r2);
+
+				r1 = r1 <= 0.0 ? 0.0 : r1 <= _PaintTime ? 1.0 : 0.25;
+				r2 = r2 <= 0.0 ? 0.0 : r2 <= _PaintTime ? 1.0 : 0.25;
 
                 // sample the texture
-                fixed4 col = fixed4(r, 0.0, 0.0, 1.0);
+                fixed4 col = fixed4(r1, r2, 0.0, r >= 0.1 ? 1.0 : 0.0);
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;

@@ -13,25 +13,36 @@ namespace Gameplay.Behaviours
         [SerializeField]
         private Vector2Int _size;
 
-        private PixelBuffer _pixelBuffer;
-        private Texture2D _texture;
+        private PixelBuffer _frontBuffer;
+        private Texture2D _frontBufferTexture;
+
+        private PixelBuffer _backBuffer;
+        private Texture2D _backBufferTexture;
 
         private void Start()
         {
-            _pixelBuffer = new PixelBuffer(_size.x, _size.y);
-            Scene.Current.Add(_pixelBuffer);
-            _texture = new Texture2D(_size.x, _size.y, TextureFormat.R8, false);
+            _frontBuffer = new PixelBuffer(_size.x, _size.y);
+            Scene.Current.Add(_frontBuffer);
+            _frontBufferTexture = new Texture2D(_size.x, _size.y, TextureFormat.R8, false);
+
+
+            _backBuffer = new PixelBuffer(_size.x, _size.y);
+            Scene.Current.Add(_backBuffer);
+            _backBufferTexture = new Texture2D(_size.x, _size.y, TextureFormat.R8, false);
         }
 
         private void Update()
         {
-            _pixelBuffer.FillTexture(_texture);
-            GetComponent<Renderer>().material.mainTexture = _texture;
+            _frontBuffer.FillTexture(_frontBufferTexture);
+            _backBuffer.FillTexture(_backBufferTexture);
+            GetComponent<Renderer>().material.SetTexture("_MainTex", _frontBufferTexture);
+            GetComponent<Renderer>().material.SetTexture("_BackTex", _backBufferTexture);
         }
 
         private void OnDestroy()
         {
-            _pixelBuffer.Dispose();
+            _frontBuffer.Dispose();
+            _backBuffer.Dispose();
         }
     }
 }

@@ -25,6 +25,8 @@ namespace Gameplay.Physics
 
         public void Add(Actor actor)
         {
+            if (_actors.Contains(actor))
+                return;
             _actors.Add(actor);
         }
 
@@ -35,6 +37,8 @@ namespace Gameplay.Physics
 
         public void Add(Solid solid)
         {
+            if (_solids.Contains(solid))
+                return;
             _solids.Add(solid);
         }
 
@@ -45,6 +49,8 @@ namespace Gameplay.Physics
 
         public void Add(Trigger trigger)
         {
+            if (_trigger.Contains(trigger))
+                return;
             _trigger.Add(trigger);
         }
 
@@ -55,12 +61,19 @@ namespace Gameplay.Physics
 
         public void Add(PixelBuffer pixelBuffer)
         {
+            if (_pixelBuffer.Contains(pixelBuffer))
+                return;
             _pixelBuffer.Add(pixelBuffer);
         }
 
         public PixelBuffer GetPixelBuffer()
         {
             return _pixelBuffer[0];
+        }
+
+        public PixelBuffer GetPixelBackBuffer()
+        {
+            return _pixelBuffer[1];
         }
 
         public void Remove(PixelBuffer pixelBuffer)

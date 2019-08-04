@@ -102,6 +102,28 @@ namespace Gameplay.Physics
             tex.Apply();
         }
 
+        private struct MergeIntoJob : IJobParallelFor
+        {
+            public NativeArray<byte> Source;
+            public NativeArray<byte> Destination;
+
+            public void Execute(int index)
+            {
+                var source = Source[index];
+                var destination = Destination[index];
+                Destination[index] = (byte)math.max((int)source, (int)destination);
+            }
+        }
+
+        public void MergeInto(PixelBuffer other)
+        {
+            new MergeIntoJob
+            {
+                Source = _data,
+                Destination = other._data,
+            }.Schedule(_data.Length, 64).Complete();
+        }
+
         public void Dispose()
         {
             _data.Dispose();
