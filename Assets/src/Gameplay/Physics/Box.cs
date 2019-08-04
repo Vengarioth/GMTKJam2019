@@ -36,6 +36,11 @@ namespace Gameplay.Physics
             return new Box(Position + delta, Size);
         }
 
+        public Box FromResize(int2 size)
+        {
+            return new Box(Position, size);
+        }
+
         public Box RowRight(int thickness = 1)
         {
             return new Box(
@@ -77,7 +82,7 @@ namespace Gameplay.Physics
         {
             return new Box(
                 new int2(Position.x + amount, Position.y + amount),
-                new int2(Size.x - amount, Size.y - amount)
+                new int2(Size.x - amount - amount, Size.y - amount - amount)
             );
         }
     }

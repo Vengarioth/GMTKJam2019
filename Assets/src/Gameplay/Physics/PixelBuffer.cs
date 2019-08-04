@@ -37,7 +37,6 @@ namespace Gameplay.Physics
 
         public void Clear()
         {
-            Debug.Log("Clear Pixel Buffer");
             _data.Dispose();
             _data = new NativeArray<byte>(_width * _height, Allocator.Persistent, NativeArrayOptions.ClearMemory);
         }

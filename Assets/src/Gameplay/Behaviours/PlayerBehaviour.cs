@@ -11,12 +11,15 @@ using static Unity.Mathematics.math;
 
 namespace Gameplay.Behaviours
 {
+    public enum Mode
+    {
+        Default,
+        Wall,
+        Dash,
+    };
+
     public class PlayerBehaviour : MonoBehaviour
     {
-        [SerializeField]
-        private Vector2Int _position;
-        [SerializeField]
-        private Vector2Int _size;
         [SerializeField]
         private int _pixelPerUnit = 100;
 
@@ -28,35 +31,64 @@ namespace Gameplay.Behaviours
         private float _maxHorizontalSpeed;
         [SerializeField]
         private int _maxStamina = 100;
-
-
+        [SerializeField]
+        private float _horizontalTweak = 0.7f;
         [SerializeField]
         private Vector2 _debugAnchor;
 
+        private float _wallJumpHorizontalSpeed = 4f;
+
+        private int2 _spawn;
         private Actor _actor;
 
         private float2 _velocity;
         private float2 _acceleration;
-        private float _horizontalVel = 0;
+
+        private bool _isGrounded;
         private bool _wasGrounded;
+
+        private bool _doJump;
+        private bool _didJump;
+        private float _horizontalInput;
+        private float _verticalInput;
+
         private int _stamina;
+        private Mode _mode;
+
+
+
+        float dt = 0.016f;
+
         private bool _jumpReleased;
 
         private int _amtOfFramesSinceJumpWasReleased = 0;
-        private int _lastWallkickDir = 0;
-        private int _wallKickMovementTimeout = 0; //ignore inputs against wall for a short period of time after wallkick
+
+        private int _framesSinceLastGrounded;
+        private int _maxFramesToJumpAfterLeavingGround = 5;
 
         [SerializeField]
-        private int _paintTollerance = 5;
+        private int _paintTollerance = 50;
         private int _paintTime;
+
+        private Box TransformAsBox()
+        {
+            var spriteSize = GetComponent<SpriteRenderer>().sprite.rect.size;
+            var position = transform.position;
+            var size = transform.lossyScale;
+            
+            return ConversionUtil.GetObjectBox(spriteSize, position, size, _pixelPerUnit);
+        }
 
         private void Start()
         {
-            _actor = new Actor(new int2(_position.x, _position.y), new int2(_size.x, _size.y), OnSquish, OnMove);
+            _actor = new Actor(TransformAsBox(), OnSquish, OnMove);
             Scene.Current.Add(_actor);
             _wasGrounded = _actor.IsGrounded();
 
+            _spawn = _actor.Bounds.Position;
+
             _stamina = _maxStamina;
+            _mode = Mode.Default;
         }
 
         private void OnMove()
@@ -72,17 +104,21 @@ namespace Gameplay.Behaviours
                     _actor.Squish();
                 }
 
-                pixelBuffer.FillBox(box.FromShrink(12), (byte)_paintTime);
+                pixelBuffer.FillBox(box.FromShrink(6), (byte)_paintTime);
             }
         }
 
         private void OnSquish()
         {
             Debug.Log("Squish");
-            _actor.Teleport(new int2(_position.x, _position.y), _actor.Squish);
+            _actor.Teleport(_spawn, _actor.Squish);
             _velocity = new float2(0f, 0f);
+            _acceleration = new float2(0f, 0f);
             Scene.Current.GetPixelBuffer().Clear();
             _paintTime = 0;
+
+            _didJump = true;
+            _didDash = true;
         }
 
         public void Replenish()
@@ -91,36 +127,270 @@ namespace Gameplay.Behaviours
             _stamina = _maxStamina;
         }
 
-        private void UpdatePaint(bool isGrounded)
+        private void UpdatePaint()
         {
-            if(!_wasGrounded && isGrounded)
+            if(!_wasGrounded && _isGrounded)
             {
                 Scene.Current.GetPixelBuffer().Clear();
                 _paintTime = 0;
             }
 
-            if(!isGrounded)
+            if(!_isGrounded)
             {
                 _paintTime += 1;
                 Shader.SetGlobalFloat("_PaintTime", ((float)_paintTime - (float)_paintTollerance) / (float)byte.MaxValue);
             }
         }
 
+        private void DefaultUpdate()
+        {
+            var epsilon = 0.1f;
+            var speed = abs(_velocity.x);
+            var absHorizontalInput = abs(_horizontalInput);
+            var speedSign = speed <= epsilon ? sign(_horizontalInput) : sign(_velocity.x);
+            var maxSpeed = 3f;
+            var horizontalAcceleration = 0.3f;
+            var horizontalDeceleration = 0.3f;
+
+            var accelerating = (_velocity.x > 0f && _horizontalInput > 0f) || (_velocity.x < 0f && _horizontalInput < 0f) || (speed <= epsilon && absHorizontalInput > epsilon);
+            var decelerating = (_velocity.x > 0f && _horizontalInput < 0f) || (_velocity.x < 0f && _horizontalInput > 0f);
+            var stopping = absHorizontalInput <= epsilon;
+
+            if (speed < maxSpeed && accelerating)
+            {
+                var delta = horizontalAcceleration * absHorizontalInput;
+                delta = min(maxSpeed - speed, delta);
+                speed += delta;
+            }
+            else if (speed > -maxSpeed && decelerating)
+            {
+                var delta = horizontalDeceleration * absHorizontalInput;
+                delta = min(abs(-maxSpeed - speed), delta);
+                speed -= delta;
+            }
+            else if (stopping)
+            {
+                var delta = horizontalDeceleration;
+                delta = min(speed, delta);
+                speed -= delta;
+            }
+
+            _velocity.x = speed * speedSign;
+
+            if (_actor.CollidesLeft() && _velocity.x < 0f)
+            {
+                _velocity.x = 0f;
+            }
+            if (_actor.CollidesRight() && _velocity.x > 0f)
+            {
+                _velocity.x = 0f;
+            }
+
+            var xh = _horizontalDistanceToJumpPeak;
+            var vx = _maxHorizontalSpeed;
+            var h = _jumpHeight;
+
+            var g = (2f * h * vx * vx) / (xh * xh);
+            var v = (2f * h * vx) / xh;
+
+            _acceleration.y = -g;
+
+            var vertical = _velocity.y * dt + (_acceleration.y * 0.5f) * dt * dt;
+            _velocity.y += _acceleration.y * dt;
+
+            if (!_didJump && _doJump && _jumpReleased && _framesSinceLastGrounded < _maxFramesToJumpAfterLeavingGround)
+            {
+                _didJump = true;
+                _velocity.y = v;
+                _jumpReleased = false;
+                Debug.Log("Jump");
+            }
+            else if (_isGrounded && _velocity.y < 0f)
+            {
+                _velocity.y = 0f;
+            }
+
+            _actor.MoveY(vertical, null);
+            _actor.MoveX(_velocity.x, null);
+
+            // Transition to Wall
+            if(_velocity.y < 0f && (_actor.CollidesLeft() || _actor.CollidesRight()))
+            {
+                _velocity.y = 0f;
+                _didJump = false;
+                _mode = Mode.Wall;
+            }
+            else if((_horizontalInput > 0f && _actor.CollidesRight()) || (_horizontalInput < 0f && _actor.CollidesLeft()))
+            {
+                _velocity.y = 0f;
+                _didJump = false;
+                _mode = Mode.Wall;
+            }
+            // Transition to Dash
+            else if(!_didDash && !_isGrounded && _jumpReleased && _doJump)
+            {
+                if(_horizontalInput > epsilon && _verticalInput > epsilon)
+                {
+                    _dashDirection = normalizesafe(new float2(1f, 1f));
+                }
+                else if(_horizontalInput > epsilon && _verticalInput < -epsilon)
+                {
+                    _dashDirection = normalizesafe(new float2(1f, -1f));
+                }
+                else if (_horizontalInput < -epsilon && _verticalInput > epsilon)
+                {
+                    _dashDirection = normalizesafe(new float2(-1f, 1f));
+                }
+                else if (_horizontalInput < -epsilon && _verticalInput < -epsilon)
+                {
+                    _dashDirection = normalizesafe(new float2(-1f, -1f));
+                }
+                else if(_horizontalInput > epsilon)
+                {
+                    _dashDirection = new float2(1f, 0f);
+                }
+                else if (_verticalInput > epsilon)
+                {
+                    _dashDirection = new float2(0f, 1f);
+                }
+                else if (_horizontalInput < -epsilon)
+                {
+                    _dashDirection = new float2(-1f, 0f);
+                }
+                else if (_verticalInput < -epsilon)
+                {
+                    _dashDirection = new float2(0f, -1f);
+                }
+                else
+                {
+                    return;
+                }
+
+                _velocity.y = 0f;
+                _didDash = true;
+                _dashFramesLeft = _dashFrames;
+                _mode = Mode.Dash;
+                _jumpReleased = false;
+            }
+        }
+
+        private void WallUpdate()
+        {
+            var xh = _horizontalDistanceToJumpPeak;
+            var vx = _maxHorizontalSpeed;
+            var h = _jumpHeight;
+
+            var g = (2f * h * vx * vx) / (xh * xh);
+            var v = (2f * h * vx) / xh;
+
+            _acceleration.y = -g * 0.08f;
+
+            if(_doJump && !_didJump && _jumpReleased)
+            {
+                _didJump = true;
+                _jumpReleased = false;
+
+                if (_actor.CollidesLeft())
+                {
+                    _velocity.y = v;
+                    _velocity.x = _wallJumpHorizontalSpeed;
+                }
+                else
+                {
+                    _velocity.y = v;
+                    _velocity.x = -_wallJumpHorizontalSpeed;
+                }
+            }
+
+            var vertical = _velocity.y * dt + (_acceleration.y * 0.5f) * dt * dt;
+            _velocity.y += _acceleration.y * dt;
+
+            _actor.MoveY(vertical, null);
+            _actor.MoveX(_velocity.x, null);
+
+            // Transition to Default
+            if (_actor.IsGrounded() || !(_actor.CollidesLeft() || _actor.CollidesRight()))
+            {
+                _mode = Mode.Default;
+            }
+            if((_actor.CollidesLeft() && _horizontalInput > 0f) || (_actor.CollidesRight() && _horizontalInput < 0f))
+            {
+                _mode = Mode.Default;
+            }
+        }
+
+        private void EndDash()
+        {
+            _dashFramesLeft = 0;
+            _mode = Mode.Default;
+            _didJump = true;
+            _didDash = true;
+        }
+
+        private int _dashFramesLeft;
+        private int _dashFrames = 5;
+        private bool _didDash;
+        private float2 _dashDirection;
+        private void DashUpdate()
+        {
+            _dashFramesLeft -= 1;
+
+            var length = 10f;
+            var d = _dashDirection * length;
+            _actor.MoveY(d.y, EndDash);
+            _actor.MoveX(d.x, EndDash);
+
+            if(_dashFramesLeft <= 0)
+            {
+                EndDash();
+            }
+        }
+
+        private void SampleInput()
+        {
+            _doJump = Input.GetButton("Jump");
+            _horizontalInput = Input.GetAxis("Horizontal");
+            _verticalInput = Input.GetAxis("Vertical");
+        }
+
         private void Update()
         {
-            var isGrounded = _actor.IsGrounded();
-            var horizontalInput = Input.GetAxis("Horizontal");
+            _wasGrounded = _isGrounded;
+            _isGrounded = _actor.IsGrounded();
 
-            UpdatePaint(isGrounded);
+            SampleInput();
+            UpdatePaint();
 
-            if (_wallKickMovementTimeout > 0) { //don't allow steering against the wall immediately after a wallkick
-                --_wallKickMovementTimeout;
-
-                horizontalInput = _lastWallkickDir;
-                //if ((int)sign(horizontalInput) == -_lastWallkickDir) {
-                //    horizontalInput = 0;
-                //}
+            if (_isGrounded)
+            {
+                _didJump = false;
+                _didDash = false;
+                _framesSinceLastGrounded = 0;
             }
+            else
+            {
+                _framesSinceLastGrounded += 1;
+            }
+
+            switch(_mode)
+            {
+                case Mode.Default:
+                    DefaultUpdate();
+                    break;
+                case Mode.Wall:
+                    WallUpdate();
+                    break;
+                case Mode.Dash:
+                    DashUpdate();
+                    break;
+            }
+
+            /*
+            var isGrounded = _actor.IsGrounded();
+            _isGrounded = isGrounded;
+
+            var horizontalInput = Input.GetAxis("Horizontal");
+            UpdatePaint(isGrounded);
 
             var doJump = Input.GetButton("Jump");
 
@@ -130,15 +400,12 @@ namespace Gameplay.Behaviours
 
             int wallTouchDir = 0;
             if (wallTouchL)
-                wallTouchDir += -1;//can't convert bool to int in c#??
+                wallTouchDir += -1;
             if (wallTouchR)
                 wallTouchDir += +1;
 
             bool horizontalInputIsAgainstWall = (int)sign(horizontalInput) == wallTouchDir;
-
-
-            bool doWallKick = false;
-
+            
             var dt = Time.deltaTime;
             var velocity = _velocity;
             var acceleration = _acceleration;
@@ -150,13 +417,17 @@ namespace Gameplay.Behaviours
             var g = (-2f * h * vx * vx) / (xh * xh);
             var v = (2f * h * vx) / xh;
 
-
-            // refresh stamina
+            // reset
             if (isGrounded)
             {
                 _stamina = _maxStamina;
                 _amtOfFramesSinceJumpWasReleased = 0; //reset jump frames because we're back on ground
-                _wallKickMovementTimeout = 0;
+                _framesSinceLastGrounded = 0;
+                _didJump = false;
+            }
+            else
+            {
+                _framesSinceLastGrounded += 1;
             }
 
             if (!doJump)
@@ -164,13 +435,14 @@ namespace Gameplay.Behaviours
                 ++_amtOfFramesSinceJumpWasReleased;
             }
 
-            if (doJump && isGrounded)
+            if (doJump && !_didJump && _jumpReleased && _framesSinceLastGrounded < _maxFramesToJumpAfterLeavingGround)
             {
+                _didJump = true;
                 Debug.Log("Jump");
                 velocity.y = v;
                 _jumpReleased = false;
             }
-            else if(isGrounded)
+            else if(isGrounded && !doJump)
             {
                 velocity.y = 0;
             }
@@ -180,24 +452,14 @@ namespace Gameplay.Behaviours
                 _jumpReleased = true;
             }
 
-            if (doJump && !isGrounded && _jumpReleased && wallTouch && horizontalInputIsAgainstWall)
-            {
-                _jumpReleased = false;
-                Debug.Log("Wallkick");
-                velocity.y = v;
-
-                doWallKick = true;
-
-                _lastWallkickDir = -wallTouchDir;
-                _wallKickMovementTimeout = 10; // frames until player input against the wall works again
-            }
-
             if (doJump && !isGrounded && _jumpReleased && _stamina >= 20)
             {
                 _stamina -= 20;
                 _jumpReleased = false;
+                _dashTimeout = _dashDuration;
+                _dashDirection = sign(horizontalInput);
+                velocity.x = _dashSpeed * _dashDirection;
                 Debug.Log("Dash");
-                velocity.y = v;
             }
 
             if (!isGrounded && _jumpReleased && _amtOfFramesSinceJumpWasReleased >= 3) {
@@ -211,11 +473,20 @@ namespace Gameplay.Behaviours
             }
 
             acceleration.y = g;
+            var vertical = 0f;
+            if(_dashTimeout > 0)
+            {
+                acceleration.y = 0;
+                _dashTimeout -= 1;
+                velocity.y = 0;
+                horizontalInput = _dashDirection;
+            }
+            else
+            {
+                vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
+                velocity.y += acceleration.y * dt;
+            }
 
-
-
-            var vertical = velocity.y * dt + (acceleration.y * 0.5f) * dt * dt;
-            velocity.y += acceleration.y * dt;
 
             const float fallspeed_cap = 40 * -10f;
             if (velocity.y < fallspeed_cap) //limit falling speed
@@ -223,59 +494,57 @@ namespace Gameplay.Behaviours
 
             //Horizontal movement stuff in this scope
             {
-                //tweakers
-                var spdMax = 0.7f; //upper bound (tweak this)
+                var epsilon = 0.1f;
+                var speed = abs(velocity.x);
+                var absHorizontalInput = abs(horizontalInput);
+                var speedSign = speed <= epsilon ? sign(horizontalInput) : sign(velocity.x);
+                var maxSpeed = 3f;
+                var horizontalAcceleration = 0.3f;
+                var horizontalDeceleration = 0.3f;
 
-                //prepare vars
-                var hv = _horizontalVel;
-                var tv = horizontalInput * spdMax; //tv = target velocity
+                var accelerating = (velocity.x > 0f && horizontalInput > 0f) || (velocity.x < 0f && horizontalInput < 0f) || (speed <= epsilon && absHorizontalInput > epsilon);
+                var decelerating = (velocity.x > 0f && horizontalInput < 0f) || (velocity.x < 0f && horizontalInput > 0f);
+                var stopping = absHorizontalInput <= epsilon;
 
-                var normalizer = sign(hv);
-                if (abs(normalizer) < 0.01) normalizer = sign(tv);
-
-                //normalize: positive == in current walking direction, negative == in opposite direction
-                hv *= normalizer;
-                tv *= normalizer;
-
-                var prevHv = hv; //hv of previous frame
-
-                if (tv > hv) { //if we want to move faster in the same direction than we currently do
-                    //accelerate!
-                    //Debug.Log("accelerate " + tv + " >  " + hv);
-                    float amt = _actor.IsGrounded() ? 0.02f : 0.04f;
-                    hv += amt; //how much to accelerate (tweak this)
+                if(speed < maxSpeed && accelerating)
+                {
+                    var delta = horizontalAcceleration * absHorizontalInput;
+                    delta = min(maxSpeed - speed, delta);
+                    speed += delta;
+                    //speed = min(speed + (horizontalAcceleration * absHorizontalInput), maxSpeed);
                 }
-                else {//if we want to slow down, or move in the other direction
-
-                    //Debug.Log("decellerate " + tv + " <= " + hv);
-                    hv -= 0.3f; //how much to decellerate (tweak this)
-
-                    if (hv < 0f) //but don't start moving backwards!
-                        hv = 0f;
+                else if(speed > -maxSpeed && decelerating)
+                {
+                    // speed = max(-maxSpeed, speed - (horizontalDeceleration * absHorizontalInput));
+                    var delta = horizontalDeceleration * absHorizontalInput;
+                    delta = min(abs(-maxSpeed - speed), delta);
+                    speed -= delta;
                 }
-
-                bool alreadyStopped = abs(prevHv) < 0.001f;
-
-                if (wallTouch && !alreadyStopped) { //stop on hitting wall, but don't stick to it if you already stopped
-                    hv = 0;
+                else if(stopping)
+                {
+                    var delta = horizontalDeceleration;
+                    delta = min(speed, delta);
+                    speed -= delta;
+                    // speed = max(0f, speed - horizontalDeceleration);
                 }
 
-                hv *= normalizer; //de-normalize
+                velocity.x = speed * speedSign;
 
-                if (doWallKick) {
-                    hv += wallTouchDir * -1.3f;
+                if(wallTouchL && velocity.x < 0f)
+                {
+                    velocity.x = 0f;
                 }
-
-                //hv = clamp(hv, -spdMax, spdMax);
-
-                _horizontalVel = hv;
+                if (wallTouchR && velocity.x > 0f)
+                {
+                    velocity.x = 0f;
+                }
             }
 
             _velocity = velocity;
             _acceleration = acceleration;
 
             _actor.MoveY(vertical, null);
-            _actor.MoveX(_horizontalVel * 10f, null);
+            _actor.MoveX(velocity.x, null);
 
             _wasGrounded = isGrounded;
 
@@ -285,21 +554,37 @@ namespace Gameplay.Behaviours
 
             DebugRenderer.Add(new HollowOpenCircle(
                 _debugAnchor,
+                0.2f,
                 0.3f,
-                0.6f,
                 (float)_stamina / (float)_maxStamina,
                 Color.green
             ));
+            */
+
+            if (_isGrounded)
+            {
+                _didJump = false;
+            }
+
+            if (!_doJump)
+            {
+                _jumpReleased = true;
+            }
+
+            var position = new Vector2(_actor.Bounds.Position.x / (float)_pixelPerUnit, _actor.Bounds.Position.y / (float)_pixelPerUnit);
+            var size = new Vector2(_actor.Bounds.Size.x / (float)_pixelPerUnit, _actor.Bounds.Size.y / (float)_pixelPerUnit);
+            transform.position = position + (size * 0.5f);
         }
 
         private void OnDrawGizmos()
         {
             Vector2Int p;
             Vector2Int s;
-            if(_actor == null)
+            if (_actor == null)
             {
-                p = _position;
-                s = _size;
+                var box = TransformAsBox();
+                p = new Vector2Int(box.Position.x, box.Position.y);
+                s = new Vector2Int(box.Size.x, box.Size.y);
             }
             else
             {

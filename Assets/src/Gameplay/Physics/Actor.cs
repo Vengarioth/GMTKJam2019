@@ -26,10 +26,11 @@ namespace Gameplay.Physics
             _onMove = onMove;
         }
 
-        public Actor(Box box, Action onSquish)
+        public Actor(Box box, Action onSquish, Action onMove)
         {
             _bounds = box;
             _onSquish = onSquish;
+            _onMove = onMove;
         }
 
         public void Teleport(int2 position, Action onCollide)

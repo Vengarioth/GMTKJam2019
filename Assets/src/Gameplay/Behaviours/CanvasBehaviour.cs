@@ -23,11 +23,6 @@ namespace Gameplay.Behaviours
             _texture = new Texture2D(_size.x, _size.y, TextureFormat.R8, false);
         }
 
-        public void Draw(Box box, byte value)
-        {
-            _pixelBuffer.FillBox(box, value);
-        }
-
         private void Update()
         {
             _pixelBuffer.FillTexture(_texture);

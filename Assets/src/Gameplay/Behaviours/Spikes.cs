@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Gameplay.Behaviours
@@ -13,6 +14,12 @@ namespace Gameplay.Behaviours
         [SerializeField]
         private int _pixelPerUnit = 100;
 
+        [SerializeField]
+        private Vector2Int _hurtBox = new Vector2Int(16, 16);
+
+        [SerializeField]
+        private Vector2Int _offset = new Vector2Int(0, 0);
+
         private Trigger _trigger;
 
         private Box TransformAsBox()
@@ -20,8 +27,8 @@ namespace Gameplay.Behaviours
             var spriteSize = GetComponent<SpriteRenderer>().sprite.rect.size;
             var position = transform.position;
             var size = transform.lossyScale;
-
-            return ConversionUtil.GetObjectBox(spriteSize, position, size, _pixelPerUnit);
+            var box = ConversionUtil.GetObjectBox(spriteSize, position, size, _pixelPerUnit);
+            return box.FromOffset(new int2(_offset.x, _offset.y)).FromResize(new int2(_hurtBox.x, _hurtBox.y));
         }
 
         private void Start()
