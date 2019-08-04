@@ -88,7 +88,7 @@
                 col1 = col1;
                 // apply fog
                 //UNITY_APPLY_FOG(i.fogCoord, col0);
-                
+                //test
                 col0 = min(col0, _ColorClamp);
                 fixed4 fin = col0;
                 fin = lerp(_BaseColor, _SecondaryColor, col0);
